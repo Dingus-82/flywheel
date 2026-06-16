@@ -103,7 +103,7 @@ void systemSetup() {
 
   BNOsetup();
   
-  MotorSetup();
+  FlywheelSetup();
 
   /*
      Add setup code for additional sensors here
@@ -164,7 +164,7 @@ void systemUpdate(){
     Addtional sensor update code here.
   */
 
- MotorUpdate();
+ FlywheelUpdate();
 
   
 
