@@ -1,255 +1,186 @@
 /*
 _____________________________________________________________
-Code for the PICOLO Flight Computer
+Code for the entire system of the Pi Pico W.
 Code by: Radhakrishna Vojjala
 Date of last modification: 21 Apr 2026
-Version 2.0.1
 _____________________________________________________________
-
+This file contains the Setup and Update functions for the entire system. The code is meant to be called in setup() and loop().
 */
 
-#include "Arduino.h"
-#include <Wire.h>
-#include <SPI.h>
-#include <SD.h>
-#include <Adafruit_BNO055.h> 
-#include <SparkFun_u-blox_GNSS_Arduino_Library.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <MS5611.h>   // Download from: https://github.com/jarzebski/Arduino-MS5611
-#include "Thermistor.h"
-#include "StemmaQtOLED.h" // Custom Library to control the StemmQT OLED screen
+// System wide setup function.
 
-// Additional libraries here
+void systemSetup() {
 
-#include "Variables.h"
+  Serial.begin(SERIAL_BAUD);
 
-#define GPS_RUN_RATE  2.0 // Max GPS update speed in Hz. May not update at this speed.
-#define DATA_RATE 1000 // Max rate of data aqusition in Hz. Set to 100 or some huge number to remove the limiter
-#define VERSION "2.0.1"
+  Wire.begin(); // default I2C clock
+ // Wire.setSCL(I2C_1_SCL);
+ // Wire.setSDA(I2C_1_SDA);
+  Wire.begin(); // default I2C clock
 
-// Config variables.
+  beginOLED(); 
 
-bool usingM8N = false; // true for M8N, false for M9N
+  Serial.println("Initialising....");
+  printOLED("Initialising....", true);
+  pinMode(ERR_LED_PIN, OUTPUT); // red LED
+  pinMode(LOOP_LED_PIN, OUTPUT); // yellow LED
+  //pinMode(LOCK_LED_PIN, OUTPUT); // blue LED
 
-// File header. Edit to add columns for other sensors.
+  // LED test
+  digitalWrite(ERR_LED_PIN, HIGH);
+  delay(100);
+  digitalWrite(LOOP_LED_PIN, HIGH);
+  delay(100);
+  //digitalWrite(LOCK_LED_PIN, HIGH);
+  delay(100);
+  digitalWrite(ERR_LED_PIN, LOW);
+  delay(100);
+  digitalWrite(LOOP_LED_PIN, LOW);
+  delay(100);
+  //digitalWrite(LOCK_LED_PIN, LOW);
 
-String header = "hh:mm:ss,FlightTimer,T(min),T(s),T(ms),FlightTime(ms),Hz,Batt (V),Fix Type,PVT,Sats,Date,Time,Lat,Lon,Alt(Ft),Alt(M),HorizAccuracy(MM),VertAccuracy(MM),VertVel(Ft/S),VertVel(M/S),ECEFstat,ECEFX(M),ECEFY(M),ECEFZ(M),NedVelNorth(M/S),NedVelEast(M/S),NedVelDown(M/S),GndSpd(M/S),Head(Deg),PDOP,ExtT(F),ExtT(C),ExtT(RK),IntT(F),IntT(C),IntT(RK),P_Pa,P_kPa,P_ATM,P_PSI,Ideal_density(kg/m^3),MSTemp(C),MSTemp(F),MSTemp(RK),MS Alt SL(Ft), MS Alt SL(M),MS Alt Rel(Ft),MS Alt Rel(M),VertVel(ft/s),VertVel(m/s),Accel(x),Accel(y),Accel(z),Deg/S(x),Deg/S(y),Deg/S(z),Ori(x),Ori(y),Ori(z),Mag_T(x),Mag_T(y),Mag_T(z),Error,ServoSpeed,P,I,D,SatCounter,SatTimer,TimeVersion:" + String(VERSION);
+  if (bno.begin()){
+    Serial.println("BNO Online!");
+    printOLED("BNO Online!", true);
+  }
+  else {
+    Serial.println("BNO Offline! Check wiring.");
+    printOLED("BNO Offline!\nCheck wiring.", true);
+    digitalWrite(ERR_LED_PIN, HIGH);
+    delay(500);
+    digitalWrite(ERR_LED_PIN, LOW);
+    systemError = true;
+  }
 
-void setup() {
-  Serial.begin(115200);
-  systemSetup();
+  /*
+  if (MSsetup()){
+    Serial.println("MS5611 Online!");
+    printOLED("MS5611 Online!", true);
+  }
+  else {
+    Serial.println("MS5611 Offline! Check wiring.");
+    printOLED("MS5611 Offline!\nCheck wiring.", true);
+    digitalWrite(ERR_LED_PIN, HIGH);
+    delay(500);
+    digitalWrite(ERR_LED_PIN, LOW);
+    error = true;
+  }
+  */
+  inTher.begin(10);
+  outTher.begin(10);
+  inTher.update();
+  outTher.update();
+  inStatus = inTher.updateStatus();
+  outStatus = outTher.updateStatus();
+
+  if (inStatus){
+    Serial.println("Internal Thermistor Connected!");
+    printOLED("Internal Thermistor\nConnected!", true);
+  }
+  else {
+    Serial.println("Internal Thermistor Offline. Check wiring.");
+    printOLED("Internal Thermistor\nOffline.\nCheck wiring.", true);
+    digitalWrite(ERR_LED_PIN, HIGH);
+    delay(500);
+    digitalWrite(ERR_LED_PIN, LOW);
+    systemError = true;
+  }
+  
+  if (outStatus){
+    Serial.println("External Thermistor Connected!");
+    printOLED("External Thermistor\nConnected!", true);
+  }
+  else {
+    Serial.println("External Thermistor Offline. Check wiring.");
+    printOLED("External Thermistor\nOffline.\nCheck wiring.", true);
+    digitalWrite(ERR_LED_PIN, HIGH);
+    delay(500);
+    digitalWrite(ERR_LED_PIN, LOW);
+    systemError = true;
+  }
+
+  //GPSsetup();
+
+  BNOsetup();
+  
+  MotorSetup();
+
+  /*
+     Add setup code for additional sensors here
+  */
+
+  SDsetup(dataFilename, dataFileN1, dataFileN2);
+  logData(header, dataFilename);
+
+  loopTime = 1000 / DATA_RATE;
+
+  Serial.println("Setup Finished");
+  printOLED("Setup Finished", true);
+  Serial.println(header);
+
+  if (!SDstatus){
+   systemError= true;
+  }
+  if (systemError){
+    digitalWrite(ERR_LED_PIN, HIGH);
+  }
 }
 
-void loop() {
+// System wide update function. Updates all sensors.
 
-  if ((millis() - nowTimeMS) >= loopTime) {
-    systemUpdate();
+void systemUpdate(){
 
-    // assembling the data srting;
+  // updating timers
 
-    data = "";
-    OLEDstr = "";
-    
-    data.concat(HHMMSS);
-    data.concat(",");
-    data.concat(flightTimeHHMMSS);
-    data.concat(",");
-    data.concat(String(nowTimeMin));
-    data.concat(",");
-    data.concat(String(nowTimeS));
-    data.concat(",");
-    data.concat(String(nowTimeMS));
-    data.concat(",");
-    data.concat(String(flightTimeMS));
-    data.concat(",");
-    data.concat(String(freq));
-    data.concat(",");
-    data.concat(String(Volt));
-    data.concat(",");
-    data.concat(fixTypeGPS);
-    data.concat(",");
-    data.concat(String(pvtStatus));
-    data.concat(",");
-    data.concat(String(SIV));
-    data.concat(",");
-    data.concat(String(gpsMonth));
-    data.concat("/");
-    data.concat(String(gpsDay));
-    data.concat("/");
-    data.concat(String(gpsYear));
-    data.concat(",");
-    data.concat(String(gpsHour));
-    data.concat(":");
-    data.concat(String(gpsMinute));
-    data.concat(":");
-    data.concat(String(gpsSecond));
-    data.concat(".");
-
-    if (gpsMillisecond < 10) {
-      data.concat("00");
-      data.concat(String(gpsMillisecond));
-      data.concat(",");
-    }
-    else if (gpsMillisecond < 100) {
-      data.concat("0");
-      data.concat(String(gpsMillisecond));
-      data.concat(",");
-    }
-    else{
-      data.concat(String(gpsMillisecond)); 
-      data.concat(",");
-    }
-
-    char paddedNumber[8]; // Buffer to hold the padded number (7 digits + null terminator)
-    data.concat(String(gpsLatInt));
-    data.concat(".");
-    // Format the number with padded zeros using sprintf()
-    sprintf(paddedNumber, "%07ld", gpsLatDec);
-    data.concat(String(paddedNumber)); // Pad the number with zeros up to 7 digits
-    data.concat(",");
-    //OLEDstr.concat("Lat: " + String(gpsLatInt) + "." + String(paddedNumber) + "\n");
-
-    data.concat(String(gpsLonInt)); 
-    data.concat(".");
-    // Format the number with padded zeros using sprintf()
-    sprintf(paddedNumber, "%07ld", gpsLonDec);
-    data.concat(String(paddedNumber)); // Pad the number with zeros up to 7 digits
-    data.concat(",");
-    //OLEDstr.concat("Lon: " + String(gpsLonInt) + "." + String(paddedNumber) + "\n");
-
-    data.concat(String(gpsAltFt));
-    data.concat(",");
-    //OLEDstr.concat("GPSft: " + String(gpsAltFt) + "\n");
-    data.concat(String(gpsAltM));
-    data.concat(",");
-    data.concat(String(gpsHorizAcc));
-    data.concat(",");
-    data.concat(String(gpsVertAcc));
-    data.concat(",");
-    data.concat(String(gpsVertVelFt));
-    data.concat(",");
-    data.concat(String(gpsVertVelM));
-    data.concat(",");
-    data.concat(String(ecefStatus));
-    data.concat(",");
-    data.concat(String(ecefX));
-    data.concat(",");
-    data.concat(String(ecefY)); 
-    data.concat(",");
-    data.concat(String(ecefZ));
-    data.concat(","); 
-    data.concat(String(velocityNED[0]));
-    data.concat(",");
-    data.concat(String(velocityNED[1])); 
-    data.concat(",");
-    data.concat(String(velocityNED[2]));
-    data.concat(","); 
-    data.concat(String(gpsGndSpeed));
-    data.concat(",");
-    data.concat(String(gpsHeading));
-    data.concat(",");
-    data.concat(String(gpsPDOP));
-    data.concat(",");
-    data.concat(String(outTempF));
-    data.concat(",");
-    data.concat(String(outTempC));
-    data.concat(",");
-    data.concat(String(outTempRK));
-    data.concat(",");
-    data.concat(String(inTempF));
-    data.concat(",");
-    data.concat(String(inTempC));
-    data.concat(",");
-    data.concat(String(inTempRK));
-    data.concat(",");
-    data.concat(String(pressPa));
-    data.concat(",");
-    data.concat(String(presskPa));
-    data.concat(",");
-    data.concat(String(pressATM));
-    data.concat(",");
-    data.concat(String(pressPSI));
-    data.concat(",");
-    data.concat(String(density));
-    data.concat(",");
-    data.concat(String(MStempC));
-    data.concat(",");
-    data.concat(String(MStempF));
-    data.concat(",");
-    data.concat(String(MStempRK));
-    data.concat(",");
-    data.concat(String(absAltFt));
-    data.concat(",");
-    //OLEDstr.concat("MSft: " + String(absAltFt) + "\n");
-    data.concat(String(absAltM));
-    data.concat(",");
-    data.concat(String(relAltFt));
-    data.concat(",");
-    data.concat(String(relAltM));
-    data.concat(",");
-    data.concat(String(vertVelFt));
-    data.concat(",");
-    data.concat(String(vertVelM));
-    data.concat(",");
-    data.concat(String(accelerometer[0]));
-    data.concat(",");
-    data.concat(String(accelerometer[1]));
-    data.concat(",");
-    data.concat(String(accelerometer[2]));
-    data.concat(",");
-    data.concat(String(gyroscope[0]));
-    data.concat(",");
-    data.concat(String(gyroscope[1]));
-    data.concat(",");
-    data.concat(String(gyroscope[2]));
-    data.concat(",");
-    data.concat(String(orientation[0]));
-    data.concat(",");
-    data.concat(String(orientation[1]));
-    data.concat(",");
-    data.concat(String(orientation[2]));
-    data.concat(",");
-    data.concat(String(magnetometer[0]));
-    data.concat(",");
-    data.concat(String(magnetometer[1]));
-    data.concat(",");
-    data.concat(String(magnetometer[2]));
-    data.concat(",");
-
-
-    data.concat(String(orientationError));
-    data.concat(",");
-    data.concat(String(motorCommand));
-    data.concat(",");
-    data.concat(String(proportional));
-    data.concat(",");
-    data.concat(String(integral));
-    data.concat(",");
-    data.concat(String(derivative));
-    data.concat(",");
-    data.concat(String(saturationCounter));
-    data.concat(",");
-    data.concat(String(saturationTimer));
-    data.concat(",");
-    data.concat(String(millis()));
-    data.concat(",");
-    /*
-      data form additional sensors
-    */
-
-    //Serial.println(data);
-    SDstatus = logData(data, dataFilename);
-
-    //OLEDstr.concat("Sats: " + String(SIV) + "  Hz: " + String(freq) + "\n");
-    //OLEDstr.concat("Ext: " + String(outTempF) + " F\nInt: " + String(inTempF) + " F\nMS: " + String(MStempF) + " F");
-    //OLEDstr.concat("X: " + String(orientation[0]) + "\nY: " + String(orientation[1]) + "\nZ: " + String(orientation[2]) + "\n");
-    ///OLEDstr.concat("X: " + String(orientation[0]) + "\n");
-    ///OLEDstr.concat("SYS: " + String(calibration[0]) + " GYRO: " + String(calibration[1]) + " ACCEL: " + String(calibration[2]) + " MAG: " + String(calibration[3]));
-    ///OLEDstr.concat("Speed: " + String(servoCommand) + "\n");
-    
-    ///printOLED(OLEDstr);
-
-    prevTime = nowTimeMS;
+  nowTimeMS = millis();
+  digitalWrite(LOOP_LED_PIN, LOW);
+  nowTimeS = nowTimeMS / 1000.0;
+  nowTimeMin = nowTimeS / 60;
+  freq = 1.0/((nowTimeMS-prevTime)/1000.0);
+  HHMMSS = timeToHhmmss(nowTimeMS);
+  if (flightStarted){
+    flightTimeMS = nowTimeMS - flightOffset;
+    flightTimeHHMMSS = timeToHhmmss(flightTimeMS);
   }
+
+  Volt = analogRead(A3)*3*3.3/(1023); // battery voltage
+
+  // updating sensors
+
+  //GPSupdate();
+  //MSupdate();
+  BNOupdate();
+
+  inTher.update();
+  inTempF = inTher.getTempF();
+  inTempC = inTher.getTempC();
+  inTempRK = ((inTempC + 273.15) / 180.0) * PI;
+  outTher.update();
+  outTempF = outTher.getTempF();
+  outTempC = outTher.getTempC();
+  outTempRK = ((outTempC + 273.15) / 180.0) * PI;
+
+  /*
+    Addtional sensor update code here.
+  */
+
+ MotorUpdate();
+
+  
+
+  digitalWrite(LOOP_LED_PIN, HIGH);
+}
+
+// Function to convert timer to HHMMSS format 
+
+String timeToHhmmss(int milli) {
+
+  int timerS = milli / 1000;
+  int hours = timerS / 3600;
+  int hoursRem = timerS % 3600;
+  int mins = hoursRem / 60;
+  int secs = hoursRem % 60;
+  char timeStr[20];
+  sprintf(timeStr, "%02d:%02d:%02d", hours, mins, secs);
+  return String(timeStr);
 }
