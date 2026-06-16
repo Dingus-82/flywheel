@@ -1,184 +1,255 @@
 /*
 _____________________________________________________________
-Variables for Pi Pico W data logger
+Code for the PICOLO Flight Computer
 Code by: Radhakrishna Vojjala
 Date of last modification: 21 Apr 2026
+Version 2.0.1
 _____________________________________________________________
-This file contains most of the variables used for the Pi Pico W flight logger.
-If other sensors are added, add their variables to this file for cleaner code formatting.
+
 */
 
-// Variables for the system
+#include "Arduino.h"
+#include <Wire.h>
+#include <SPI.h>
+#include <SD.h>
+#include <Adafruit_BNO055.h> 
+#include <SparkFun_u-blox_GNSS_Arduino_Library.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <MS5611.h>   // Download from: https://github.com/jarzebski/Arduino-MS5611
+#include "Thermistor.h"
+#include "StemmaQtOLED.h" // Custom Library to control the StemmQT OLED screen
 
-#define SERIAL_BAUD 115200
-#define ERR_LED_PIN 20
-#define LOOP_LED_PIN 21
-#define I2C_1_SDA 2
-#define I2C_1_SCL 3
+// Additional libraries here
 
-int nowTimeMS = 0;
-float nowTimeS = 0;
-float nowTimeMin = 0;
-int prevTime = 0;
-int flightTimeMS = 0;
-String flightTimeHHMMSS = "";
-String HHMMSS = "";
-String data = "";
-float freq = 0;
-int loopTime = 0;
-bool error = false;
-int Volt = 0;
-bool flightStarted = false;
-int flightOffset = 0;
+#include "Variables.h"
 
-Thermistor inTher(A0);
-Thermistor outTher(A1); 
+#define GPS_RUN_RATE  2.0 // Max GPS update speed in Hz. May not update at this speed.
+#define DATA_RATE 1000 // Max rate of data aqusition in Hz. Set to 100 or some huge number to remove the limiter
+#define VERSION "2.0.1"
 
-bool inStatus = false;
-bool outStatus = false;
-float inTempF = 0;
-float inTempC = 0;
-float inTempRK = 0;
-float outTempRK = 0;
-float outTempF = 0;
-float outTempC = 0;
+// Config variables.
 
-// Variables for SPI SD card reader
+bool usingM8N = false; // true for M8N, false for M9N
 
-#define CS 17    // Chip select pin is GP17
-#define MOSI 19  // Master out Slave in (SPI TX) is GP19
-#define MISO 16  // Master in Slave out (SPI RX) is GP16
-#define SCK 18   // SPI clock signal pin is GP18
+// File header. Edit to add columns for other sensors.
 
-File dataLog;
-bool SDstatus = true;
-bool SDfull = true;
-bool filesAvailable = true;
-char dataFilename[] = "PICOLO00.csv";  //Make sure dataFileN matches first and second place of the zeros in terms of the arrays index
-const byte dataFileN1 = 6;
-const byte dataFileN2 = 7;
+String header = "hh:mm:ss,FlightTimer,T(min),T(s),T(ms),FlightTime(ms),Hz,Batt (V),Fix Type,PVT,Sats,Date,Time,Lat,Lon,Alt(Ft),Alt(M),HorizAccuracy(MM),VertAccuracy(MM),VertVel(Ft/S),VertVel(M/S),ECEFstat,ECEFX(M),ECEFY(M),ECEFZ(M),NedVelNorth(M/S),NedVelEast(M/S),NedVelDown(M/S),GndSpd(M/S),Head(Deg),PDOP,ExtT(F),ExtT(C),ExtT(RK),IntT(F),IntT(C),IntT(RK),P_Pa,P_kPa,P_ATM,P_PSI,Ideal_density(kg/m^3),MSTemp(C),MSTemp(F),MSTemp(RK),MS Alt SL(Ft), MS Alt SL(M),MS Alt Rel(Ft),MS Alt Rel(M),VertVel(ft/s),VertVel(m/s),Accel(x),Accel(y),Accel(z),Deg/S(x),Deg/S(y),Deg/S(z),Ori(x),Ori(y),Ori(z),Mag_T(x),Mag_T(y),Mag_T(z),Error,ServoSpeed,P,I,D,SatCounter,SatTimer,TimeVersion:" + String(VERSION);
 
-// Variables for GPS
+void setup() {
+  Serial.begin(115200);
+  systemSetup();
+}
 
-#define LOCK_LED_PIN 5//22
-#define DYN_MODEL DYN_MODEL_AIRBORNE2g
+void loop() {
 
-SFE_UBLOX_GNSS sparkFunGNSS;
+  if ((millis() - nowTimeMS) >= loopTime) {
+    systemUpdate();
 
-String GPStype = "M8N";
-int gpsBaud = 9600;  // 9600 for M8N, 38400 for M9N
-unsigned long gpsTimer = 0;
-byte gpsStatus = 0;
-int gpsMonth = 999;
-int gpsDay = 999;
-int gpsYear = 999;
-int gpsHour = 999;
-int gpsMinute = 999;
-int gpsSecond = 999;
-int gpsMillisecond = 999;
-int gpsTimeOfWeek = 999;
-double gpsLat = 999;
-double gpsLon = 999;
-double gpsAltM = 999;
-double gpsAltFt = 999;
-double gpsGndSpeed = 999;
-double gpsHeading = 999;
-double gpsPDOP = 999;
-long gpsLatDec = 999;
-int gpsLatInt = 999;
-long gpsLonDec = 999;
-int gpsLonInt = 999;
-float altitudeFtGPS = 999;
-float latitudeGPS = 999;
-float longitudeGPS = 999;
-long ecefX = 999, ecefY = 999, ecefZ = 999;
-double posAcc = 999;
-int SIV = 0;
-double latCalc = 999, longCalc = 999, altCalcFt = 999;
-double UTMNorthing = 999, UTMEasting = 999;
-char UTMZoneLetter = '?';
-int UTMZoneNum = 999;
-bool pvtStatus = false;
-bool ecefStatus = false;
-double gpsVertVelFt = 999;
-double gpsVertVelM = 999;
-unsigned long gpsPrevTime = 0;
-double gpsPrevAlt = 0;
-double velocityNED[3] = { 999, 999, 999 };
-int gpsHorizAcc = 999;
-int gpsVertAcc = 999;
-String fixTypeGPS = "N/A";  // create an empty string called msgStr with a capacity if 40 chars
-const uint8_t currentKeyLengthBytes = 16;
-const char currentDynamicKey[] = "7875bc2e9cb9252cef9070aef9ecd091";
-const uint16_t currentKeyGPSWeek = 2297;  // Update this when you add new keys
-const uint32_t currentKeyGPSToW = 84558;
-const uint8_t nextKeyLengthBytes = 16;
-const char nextDynamicKey[] = "3fce6f457544996e2e6292b260b52cd7";
-const uint16_t nextKeyGPSWeek = 2301;  // Update this when you add new keys
-const uint32_t nextKeyGPSToW = 84558;
+    // assembling the data srting;
 
-// Variables for BNO IMU
+    data = "";
+    OLEDstr = "";
+    
+    data.concat(HHMMSS);
+    data.concat(",");
+    data.concat(flightTimeHHMMSS);
+    data.concat(",");
+    data.concat(String(nowTimeMin));
+    data.concat(",");
+    data.concat(String(nowTimeS));
+    data.concat(",");
+    data.concat(String(nowTimeMS));
+    data.concat(",");
+    data.concat(String(flightTimeMS));
+    data.concat(",");
+    data.concat(String(freq));
+    data.concat(",");
+    data.concat(String(Volt));
+    data.concat(",");
+    data.concat(fixTypeGPS);
+    data.concat(",");
+    data.concat(String(pvtStatus));
+    data.concat(",");
+    data.concat(String(SIV));
+    data.concat(",");
+    data.concat(String(gpsMonth));
+    data.concat("/");
+    data.concat(String(gpsDay));
+    data.concat("/");
+    data.concat(String(gpsYear));
+    data.concat(",");
+    data.concat(String(gpsHour));
+    data.concat(":");
+    data.concat(String(gpsMinute));
+    data.concat(":");
+    data.concat(String(gpsSecond));
+    data.concat(".");
 
-Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire);
-float magnetometer[3] = { 999, 999, 999 };   // {x, y, z}
-float accelerometer[3] = { 999, 999, 999 };  // {x, y, z}
-float gyroscope[3] = { 999, 999, 999 };      // {x, y, z}
-float orientation[3] = { 999, 999, 999 };    // {yaw (rotation about z axis), roll (rotation about y axis), pitch (rotation about x axis)}
-float calibration[4] = { 999, 999, 999, 999 };
-// Variables for Stemma QT OLED. Other varables may be found in the OLED's header file.
+    if (gpsMillisecond < 10) {
+      data.concat("00");
+      data.concat(String(gpsMillisecond));
+      data.concat(",");
+    }
+    else if (gpsMillisecond < 100) {
+      data.concat("0");
+      data.concat(String(gpsMillisecond));
+      data.concat(",");
+    }
+    else{
+      data.concat(String(gpsMillisecond)); 
+      data.concat(",");
+    }
 
-String OLEDstr = "";
+    char paddedNumber[8]; // Buffer to hold the padded number (7 digits + null terminator)
+    data.concat(String(gpsLatInt));
+    data.concat(".");
+    // Format the number with padded zeros using sprintf()
+    sprintf(paddedNumber, "%07ld", gpsLatDec);
+    data.concat(String(paddedNumber)); // Pad the number with zeros up to 7 digits
+    data.concat(",");
+    //OLEDstr.concat("Lat: " + String(gpsLatInt) + "." + String(paddedNumber) + "\n");
 
-// Variables for MS5611
+    data.concat(String(gpsLonInt)); 
+    data.concat(".");
+    // Format the number with padded zeros using sprintf()
+    sprintf(paddedNumber, "%07ld", gpsLonDec);
+    data.concat(String(paddedNumber)); // Pad the number with zeros up to 7 digits
+    data.concat(",");
+    //OLEDstr.concat("Lon: " + String(gpsLonInt) + "." + String(paddedNumber) + "\n");
 
-MS5611 ms;
-const double R = 287.05; // Gas constant for air
-bool msOnline = false;
-double refPress = 0;
-double MStempC = 999;
-double MStempF = 1830.2;  // 999C in F
-double MStempRK = 3.14159265359;
-double pressPa = 0;
-double presskPa = 0;
-double pressATM = 0;
-double pressPSI = 0;
-double absAltM = 0;
-double absAltFt = 0;
-double relAltM = 0;
-double relAltFt = 0;
-double vertVelM = 0;
-double vertVelFt = 0;
-double density = 0;
-// Additional variables here
+    data.concat(String(gpsAltFt));
+    data.concat(",");
+    //OLEDstr.concat("GPSft: " + String(gpsAltFt) + "\n");
+    data.concat(String(gpsAltM));
+    data.concat(",");
+    data.concat(String(gpsHorizAcc));
+    data.concat(",");
+    data.concat(String(gpsVertAcc));
+    data.concat(",");
+    data.concat(String(gpsVertVelFt));
+    data.concat(",");
+    data.concat(String(gpsVertVelM));
+    data.concat(",");
+    data.concat(String(ecefStatus));
+    data.concat(",");
+    data.concat(String(ecefX));
+    data.concat(",");
+    data.concat(String(ecefY)); 
+    data.concat(",");
+    data.concat(String(ecefZ));
+    data.concat(","); 
+    data.concat(String(velocityNED[0]));
+    data.concat(",");
+    data.concat(String(velocityNED[1])); 
+    data.concat(",");
+    data.concat(String(velocityNED[2]));
+    data.concat(","); 
+    data.concat(String(gpsGndSpeed));
+    data.concat(",");
+    data.concat(String(gpsHeading));
+    data.concat(",");
+    data.concat(String(gpsPDOP));
+    data.concat(",");
+    data.concat(String(outTempF));
+    data.concat(",");
+    data.concat(String(outTempC));
+    data.concat(",");
+    data.concat(String(outTempRK));
+    data.concat(",");
+    data.concat(String(inTempF));
+    data.concat(",");
+    data.concat(String(inTempC));
+    data.concat(",");
+    data.concat(String(inTempRK));
+    data.concat(",");
+    data.concat(String(pressPa));
+    data.concat(",");
+    data.concat(String(presskPa));
+    data.concat(",");
+    data.concat(String(pressATM));
+    data.concat(",");
+    data.concat(String(pressPSI));
+    data.concat(",");
+    data.concat(String(density));
+    data.concat(",");
+    data.concat(String(MStempC));
+    data.concat(",");
+    data.concat(String(MStempF));
+    data.concat(",");
+    data.concat(String(MStempRK));
+    data.concat(",");
+    data.concat(String(absAltFt));
+    data.concat(",");
+    //OLEDstr.concat("MSft: " + String(absAltFt) + "\n");
+    data.concat(String(absAltM));
+    data.concat(",");
+    data.concat(String(relAltFt));
+    data.concat(",");
+    data.concat(String(relAltM));
+    data.concat(",");
+    data.concat(String(vertVelFt));
+    data.concat(",");
+    data.concat(String(vertVelM));
+    data.concat(",");
+    data.concat(String(accelerometer[0]));
+    data.concat(",");
+    data.concat(String(accelerometer[1]));
+    data.concat(",");
+    data.concat(String(accelerometer[2]));
+    data.concat(",");
+    data.concat(String(gyroscope[0]));
+    data.concat(",");
+    data.concat(String(gyroscope[1]));
+    data.concat(",");
+    data.concat(String(gyroscope[2]));
+    data.concat(",");
+    data.concat(String(orientation[0]));
+    data.concat(",");
+    data.concat(String(orientation[1]));
+    data.concat(",");
+    data.concat(String(orientation[2]));
+    data.concat(",");
+    data.concat(String(magnetometer[0]));
+    data.concat(",");
+    data.concat(String(magnetometer[1]));
+    data.concat(",");
+    data.concat(String(magnetometer[2]));
+    data.concat(",");
 
-#define ServoStatusLED 22
 
+    data.concat(String(orientationError));
+    data.concat(",");
+    data.concat(String(motorCommand));
+    data.concat(",");
+    data.concat(String(proportional));
+    data.concat(",");
+    data.concat(String(integral));
+    data.concat(",");
+    data.concat(String(derivative));
+    data.concat(",");
+    data.concat(String(saturationCounter));
+    data.concat(",");
+    data.concat(String(saturationTimer));
+    data.concat(",");
+    data.concat(String(millis()));
+    data.concat(",");
+    /*
+      data form additional sensors
+    */
 
-double BNO055_SAMPLERATE_DELAY_MS = 100;
-double targetOrient = 0.0;  // Target heading in degrees
-double tolerance = 0.25;  // Tolerance in degrees
-int maxServoSpeed = 75;  // Maximum servo speed (0-180)
-int minServoSpeed = 13;    // Minimum servo speed (0-180)
-int servoOff = 0;     // Neutral position (no rotation)
-float orientationError = 0;
-float servoCommand = 0;
-float pidOutput = 0;
-float currentHeading = 0;
-float previousError = 0;
-unsigned long previousTime = 0;
-// PID Constants
-float integral = 999;
-float proportional = 999;
-float prevProp = 999;
-float derivative = 999;
-//double KP = 0.8;  // Proportional gain
-double KP = 1.0;
-//double KI = 0.1; // Integral gain  
-double KI = 2.0; // Integral gain  
-//double KD = 0.05;  // Derivative gain
-double KD = 0.15;
-int saturationCounter = 0;
-int saturationTimer = 0;
+    //Serial.println(data);
+    SDstatus = logData(data, dataFilename);
 
+    //OLEDstr.concat("Sats: " + String(SIV) + "  Hz: " + String(freq) + "\n");
+    //OLEDstr.concat("Ext: " + String(outTempF) + " F\nInt: " + String(inTempF) + " F\nMS: " + String(MStempF) + " F");
+    //OLEDstr.concat("X: " + String(orientation[0]) + "\nY: " + String(orientation[1]) + "\nZ: " + String(orientation[2]) + "\n");
+    ///OLEDstr.concat("X: " + String(orientation[0]) + "\n");
+    ///OLEDstr.concat("SYS: " + String(calibration[0]) + " GYRO: " + String(calibration[1]) + " ACCEL: " + String(calibration[2]) + " MAG: " + String(calibration[3]));
+    ///OLEDstr.concat("Speed: " + String(servoCommand) + "\n");
+    
+    ///printOLED(OLEDstr);
 
-//int sdCounter = 0;
+    prevTime = nowTimeMS;
+  }
+}
