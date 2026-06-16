@@ -75,13 +75,20 @@ bool SDsetup(char *dataFile, byte const &N1, byte const &N2){
 // SD logging Function
 
 bool logData(String const &Data, char const *dataFile){
-  dataLog = SD.open(dataFile, FILE_WRITE);
+
   if (!dataLog) {
-    return false;
+    dataLog = SD.open(dataFile, FILE_WRITE);
+    if (!dataLog) {
+      return false;
+    }
   }
-  dataLog.seek(EOF);
+  //dataLog.seek(EOF);
   dataLog.println(Data);
-  dataLog.close();
+  sdCounter++;
+  if (sdCounter >= 150) {
+    sdCounter = 0;
+    dataLog.flush();
+  }
 
   return true;
 }
