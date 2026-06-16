@@ -27,6 +27,7 @@ String data = "";
 float freq = 0;
 int loopTime = 0;
 bool systemError = false;
+bool error = false;
 int Volt = 0;
 bool flightStarted = false;
 int flightOffset = 0;
@@ -205,3 +206,7 @@ double KD = .3;
 // Saturation Protection
 int saturationCounter = 0;
 unsigned long saturationTimer = 0;
+
+
+
+int sdCounter = 0;
