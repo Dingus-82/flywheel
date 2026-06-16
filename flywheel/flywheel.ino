@@ -220,7 +220,7 @@ void loop() {
 
     data.concat(String(orientationError));
     data.concat(",");
-    data.concat(String(servoCommand));
+    data.concat(String(motorCommand));
     data.concat(",");
     data.concat(String(proportional));
     data.concat(",");
