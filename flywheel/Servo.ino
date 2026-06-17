@@ -126,14 +126,14 @@ void testWheel(){
 float calculateError(float current, float target) {
   julianD = julianDay(gpsYear, gpsMonth, gpsDay, gpsHour, gpsMinute, gpsSecond);
 
-  hourUTC = gpsHour + 6;
+  hourUTC = gpsHour + 5;
   minuteUTC = gpsMinute;
   secondUTC = gpsSecond;
 
   trackedAngle = sunAzimuthDeg(julianD, gpsLat, hourUTC, minuteUTC, secondUTC);
   
   //float difference = target - current;
-  float difference = target - trackedAngle;
+  float difference = trackedAngle - current;
 
   if (difference < -180) difference += 360;
   else if (difference > 180) difference -= 360;
