@@ -130,7 +130,7 @@ float calculateError(float current, float target) {
   minuteUTC = gpsMinute;
   secondUTC = gpsSecond;
 
-  trackedAngle = sunAzimuthDeg(julianD, gpsLat, hourUTC, minuteUTC, secondUTC);
+  trackedAngle = sunAzimuthDeg(julianD, gpsLat, gpsLon, hourUTC, minuteUTC, secondUTC);
   
   //float difference = target - current;
   float difference = trackedAngle - current;
@@ -232,9 +232,9 @@ void FlywheelUpdate() {
 
   // Negative because spinning the flywheel CW pushes the box CCW
   setMotorSpeed(-motorCommand);
-Serial.print("Target: "); Serial.print(targetOrient);
-Serial.print("  Current: "); Serial.print(orientation[0]);
-Serial.print("  Error: "); Serial.print(orientationError);
-Serial.print("  CMD: "); Serial.println(motorCommand);
+//Serial.print("Target: "); Serial.print(targetOrient);
+//Serial.print("  Current: "); Serial.print(orientation[0]);
+//Serial.print("  Error: "); Serial.print(orientationError);
+//Serial.print("  CMD: "); Serial.println(motorCommand);
 
 }
