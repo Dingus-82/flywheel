@@ -199,9 +199,9 @@ float prevProp = 0;
 float derivative = 0;
 
 // PID Constants
-double KP = 1.5;
-double KI = .01;
-double KD = .3;
+double KP = 2.0;
+double KI = 1.0;
+double KD = 0.3;
 
 // Saturation Protection
 int saturationCounter = 0;
@@ -210,3 +210,13 @@ unsigned long saturationTimer = 0;
 
 
 int sdCounter = 0;
+
+
+// Tracking Variables
+
+double julianD = 0;
+double trackedAngle = 0;
+
+int hourUTC = 0;
+int minuteUTC = 0;
+int secondUTC = 0;
