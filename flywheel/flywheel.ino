@@ -24,7 +24,7 @@ _____________________________________________________________
 
 #include "Variables.h"
 
-#define GPS_RUN_RATE  2.0 // Max GPS update speed in Hz. May not update at this speed.
+#define GPS_RUN_RATE  0.01667 // Max GPS update speed in Hz. May not update at this speed.
 #define DATA_RATE 1000 // Max rate of data aqusition in Hz. Set to 100 or some huge number to remove the limiter
 #define VERSION "2.0.1"
 
@@ -231,6 +231,8 @@ void loop() {
     data.concat(String(saturationCounter));
     data.concat(",");
     data.concat(String(saturationTimer));
+    data.concat(",");
+    data.concat(String(trackedAngle));
     data.concat(",");
     data.concat(String(millis()));
     data.concat(",");
