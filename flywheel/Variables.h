@@ -220,3 +220,5 @@ double trackedAngle = 0;
 int hourUTC = 0;
 int minuteUTC = 0;
 int secondUTC = 0;
+
+int startupTime = 0;
