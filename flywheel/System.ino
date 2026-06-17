@@ -10,7 +10,7 @@ This file contains the Setup and Update functions for the entire system. The cod
 // System wide setup function.
 
 void systemSetup() {
-
+  startupTime = millis();
   Serial.begin(SERIAL_BAUD);
 
   Wire.begin(); // default I2C clock
@@ -163,7 +163,10 @@ void systemUpdate(){
   /*
     Addtional sensor update code here.
   */
-  FlywheelUpdate();
+
+  if (millis() - startupTime > 1800000) {
+    FlywheelUpdate();
+  }
 
   
 
