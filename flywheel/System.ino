@@ -99,7 +99,7 @@ void systemSetup() {
     systemError = true;
   }
 
-  //GPSsetup();
+  GPSsetup();
 
   BNOsetup();
   
@@ -163,8 +163,7 @@ void systemUpdate(){
   /*
     Addtional sensor update code here.
   */
-
- FlywheelUpdate();
+  FlywheelUpdate();
 
   
 
