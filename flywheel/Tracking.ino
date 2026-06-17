@@ -16,6 +16,7 @@ double julianDay(int y, int m, int d, int h, int min, int s) {
 double sunAzimuthDeg(
     double JD,
     double latitudeDeg,
+    double longitudeDeg,
     double hourUTC,
     double minuteUTC,
     double secondUTC
@@ -41,9 +42,15 @@ double sunAzimuthDeg(
     double delta = asin(sin(epsilon) * sin(lambdaRad));
 
     // solar time → hour angle (simplified)
-    double timeUTC = hourUTC + minuteUTC / 60.0 + secondUTC / 3600.0;
-    double H = (timeUTC - 12.0) * 15.0 * DEG_TO_RAD;
+    //double timeUTC = hourUTC + minuteUTC / 60.0 + secondUTC / 3600.0;
+    //double H = (timeUTC - 12.0) * 15.0 * DEG_TO_RAD;
 
+    double timeUTC = hourUTC + minuteUTC / 60.0 + secondUTC / 3600.0;
+
+    // longitude correction (CRITICAL)
+    double solarTime = timeUTC + (longitudeDeg / 15.0);
+
+    double H = (solarTime - 12.0) * 15.0 * DEG_TO_RAD;
     // latitude
     double phi = latitudeDeg * DEG_TO_RAD;
 
@@ -56,8 +63,9 @@ double sunAzimuthDeg(
     double azDeg = az * RAD_TO_DEG;
 
     // convert to compass heading (0–360)
-    double heading = fmod((azDeg + 180.0), 360.0);
+    double heading = fmod(azDeg + 360.0, 360.0);
     if (heading < 0) heading += 360.0;
+    
 
     return heading;
 }
