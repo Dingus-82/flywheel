@@ -1,3 +1,22 @@
+void timeUpdate() {
+  
+  MilliSeconds += (millis() - prevMillis);
+  
+  if (MilliSeconds >= 60000) {
+    gpsMinute++;
+    MilliSeconds = 0;
+  }
+
+  if (gpsMinute >= 60) {
+    gpsHour++;
+    gpsMinute = 0;
+  }
+
+  prevMillis = millis();
+
+}
+
+
 double julianDay(int y, int m, int d, int h, int min, int s) {
     if (m <= 2) {
         y -= 1;
@@ -56,15 +75,17 @@ double sunAzimuthDeg(
 
     // azimuth
     double az = atan2(
-        sin(H),
-        cos(H) * sin(phi) - tan(delta) * cos(phi)
+        -sin(H), 
+        cos(phi) * tan(delta) - sin(phi) * cos(H)
     );
 
     double azDeg = az * RAD_TO_DEG;
 
     // convert to compass heading (0–360)
-    double heading = fmod(azDeg + 360.0, 360.0);
-    if (heading < 0) heading += 360.0;
+    double heading = fmod(azDeg, 360.0);
+    if (heading < 0) {
+        heading += 360.0;
+    }
     
 
     return heading;
