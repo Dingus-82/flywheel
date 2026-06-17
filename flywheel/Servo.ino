@@ -84,18 +84,18 @@ void FlywheelSetup() {
   delay(100);
 
   // Wait for magnetometer calibration (same pattern as servo code)
-unsigned long calStartTime = millis();
-while (calibration[3] != 3) {
-    BNOupdate();
-    printOLED("MAG: " + String(calibration[3]));
-    digitalWrite(ERR_LED_PIN, HIGH);
-    
-    if (millis() - calStartTime > 5000) {  // 30 second timeout
-        printOLED("MAG timeout!\nContinuing...");
-        break;
-    }
-}
-digitalWrite(ERR_LED_PIN, LOW);
+  unsigned long calStartTime = millis();
+  while (calibration[3] != 3) {
+      BNOupdate();
+      printOLED("MAG: " + String(calibration[3]));
+      digitalWrite(ERR_LED_PIN, HIGH);
+      
+      //if (millis() - calStartTime > 30000) {  // 30 second timeout
+      //    printOLED("MAG timeout!\nContinuing...");
+      //    break;
+      //}
+  }
+  digitalWrite(ERR_LED_PIN, LOW);
 
   // Double-blink to signal ready
   digitalWrite(ERR_LED_PIN,    HIGH);
@@ -124,7 +124,16 @@ void testWheel(){
 //  controller always takes the shortest arc.
 // ─────────────────────────────────────────────
 float calculateError(float current, float target) {
-  float difference = target - current;
+  julianD = julianDay(gpsYear, gpsMonth, gpsDay, gpsHour, gpsMinute, gpsSecond);
+
+  hourUTC = gpsHour + 6;
+  minuteUTC = gpsMinute;
+  secondUTC = gpsSecond;
+
+  trackedAngle = sunAzimuthDeg(julianD, gpsLat, hourUTC, minuteUTC, secondUTC);
+  
+  //float difference = target - current;
+  float difference = target - trackedAngle;
 
   if (difference < -180) difference += 360;
   else if (difference > 180) difference -= 360;
