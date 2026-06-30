@@ -71,15 +71,15 @@ int gpsBaud = 9600;  // 9600 for M8N, 38400 for M9N
 unsigned long gpsTimer = 0;
 byte gpsStatus = 0;
 int gpsMonth = 6;
-int gpsDay = 17;
+int gpsDay = 18;
 int gpsYear = 2026;
-int gpsHour = 15;
-int gpsMinute = 57;
+int gpsHour = 11;
+int gpsMinute = 52; 
 int gpsSecond = 0;
 int gpsMillisecond = 0;
 int gpsTimeOfWeek = 999;
-double gpsLat = 44.9778;
-double gpsLon = -93.2650;
+double gpsLat = 44.09914;
+double gpsLon = -94.23230;
 double gpsAltM = 999;
 double gpsAltFt = 999;
 double gpsGndSpeed = 999;
@@ -199,14 +199,14 @@ float prevProp = 0;
 float derivative = 0;
 
 // PID Constants
-double KP = 2.0;
-double KI = 1.0;
-double KD = 0.3;
+double KP = 0.8;
+double KI = 0.5;
+double KD = 0.1;
 
 // Saturation Protection
 int saturationCounter = 0;
 unsigned long saturationTimer = 0;
-
+int integralCounter = 0;
 
 
 int sdCounter = 0;
