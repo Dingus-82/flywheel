@@ -99,7 +99,7 @@ void systemSetup() {
     systemError = true;
   }
 
-  GPSsetup();
+  //GPSsetup();
 
   BNOsetup();
   
@@ -146,7 +146,7 @@ void systemUpdate(){
   Volt = analogRead(A3)*3*3.3/(1023); // battery voltage
 
   // updating sensors
-
+  timeUpdate();
   //GPSupdate();
   //MSupdate();
   BNOupdate();
@@ -164,9 +164,12 @@ void systemUpdate(){
     Addtional sensor update code here.
   */
 
-  if (millis() - startupTime > 1800000) {
+  //if (millis() - startupTime > 2700000) {                     //45 minute timer before wheel begins
     FlywheelUpdate();
-  }
+  //} 
+  //Serial.println(millis());
+  //Serial.println(startupTime);
+  //Serial.println(millis() - startupTime);
 
   
 
