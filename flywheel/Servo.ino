@@ -5,12 +5,13 @@
 // ─────────────────────────────────────────────
 
 // ── Pin definitions ──────────────────────────
-const int STBY  = 14;
-const int AIN1 = 12;
-const int AIN2 = 13;
-const int PWMA  = 15;
+//const int STBY  = 14;
+//const int AIN1 = 12;
+//const int AIN2 = 13;
+//const int PWMA  = 15;
 
-
+const int PWM = 12;
+const int DIR = 13;
 
 
 const int maxFlywheelSpeed = 255;   // PWM ceiling (0–255)
@@ -37,19 +38,23 @@ void setMotorSpeed(int speed) {
   speed = constrain(speed, -maxFlywheelSpeed, maxFlywheelSpeed);
 
   if (speed > 0) {
-    digitalWrite(AIN1, HIGH);
-    digitalWrite(AIN2, LOW);
+    digitalWrite(DIR, LOW);
+    //digitalWrite(AIN1, HIGH);
+    //digitalWrite(AIN2, LOW);
   } else if (speed < 0) {
-    digitalWrite(AIN1, LOW);
-    digitalWrite(AIN2, HIGH);
+    digitalWrite(DIR, HIGH);
+    //digitalWrite(AIN1, LOW);
+    //digitalWrite(AIN2, HIGH);
   } else {
     // Active brake: both LOW lets the motor coast;
     // set both HIGH for a harder brake if preferred.
-    digitalWrite(AIN1, LOW);
-    digitalWrite(AIN2, LOW);
+    digitalWrite(DIR, LOW);
+    //digitalWrite(AIN1, LOW);
+    //digitalWrite(AIN2, LOW);
   }
 
-  analogWrite(PWMA, abs(speed));
+  //analogWrite(PWMA, abs(speed));
+  analogWrite(PWM, abs(speed));
 }
 
 
@@ -61,23 +66,24 @@ void setMotorSpeed(int speed) {
 // ─────────────────────────────────────────────
 void FlywheelSetup() {
   printOLED("Testing flywheel...");
+  pinMode(DIR, OUTPUT);
+  pinMode(PWM, OUTPUT);
+  //pinMode(PWMA,    OUTPUT);
+  //pinMode(AIN1, OUTPUT);
+  //pinMode(AIN2, OUTPUT);
+  //pinMode(STBY,    OUTPUT);
 
-  pinMode(PWMA,    OUTPUT);
-  pinMode(AIN1, OUTPUT);
-  pinMode(AIN2, OUTPUT);
-  pinMode(STBY,    OUTPUT);
-
-  digitalWrite(STBY, HIGH);   // Take driver out of standby
+  //digitalWrite(STBY, HIGH);   // Take driver out of standby
 
   pinMode(ServoStatusLED, OUTPUT);
   digitalWrite(ServoStatusLED, HIGH);
 
   // Ramp test — verify motor spins both directions
-  setMotorSpeed(255);   delay(250);
   setMotorSpeed(128);   delay(250);
+  setMotorSpeed(64);   delay(250);
   setMotorSpeed(0);     delay(250);
+  setMotorSpeed(-64);  delay(250);
   setMotorSpeed(-128);  delay(250);
-  setMotorSpeed(-255);  delay(250);
   setMotorSpeed(0);     delay(2000);
 
   digitalWrite(ServoStatusLED, LOW);
@@ -110,7 +116,7 @@ void FlywheelSetup() {
  
 
 void testWheel(){
-    setMotorSpeed(255);   delay(250);
+  setMotorSpeed(255);   delay(250);
   setMotorSpeed(128);   delay(250);
   setMotorSpeed(0);     delay(250);
   setMotorSpeed(-128);  delay(250);
@@ -156,7 +162,10 @@ float calculateError(float current, float target) {
 float PID(float error) {
   float currentTime = millis();
   float deltaTime   = (currentTime - previousTime) / 1000.0;
-
+  if (integralCounter < 100) {
+    integral = 0;                 //starts w/ I = 0;
+    integralCounter++;
+  }
   // Proportional
   proportional = KP * error;
 
@@ -172,7 +181,7 @@ float PID(float error) {
   float output = round(proportional + integral + derivative);
 
   previousError = error;
-  previousTime  = currentTime;
+  //previousTime  = currentTime;
 
   return output;
 }
@@ -208,7 +217,7 @@ void FlywheelUpdate() {
 
   // ── Saturation protection ─────────────────────────────────
   // Count how many consecutive updates we've been at full speed
-  if (abs(motorCommand) >= maxFlywheelSpeed - 5) {
+  if (abs(motorCommand) >= maxFlywheelSpeed - 30) {
     saturationCounter++;
     if (saturationCounter >= SAT_COUNT_LIMIT && saturationTimer == 0) {
       saturationTimer = millis();  // Start the timer
@@ -231,7 +240,8 @@ void FlywheelUpdate() {
   }
 
   // Negative because spinning the flywheel CW pushes the box CCW
-  setMotorSpeed(-motorCommand);
+  setMotorSpeed(motorCommand);
+  previousTime = millis();
 //Serial.print("Target: "); Serial.print(targetOrient);
 //Serial.print("  Current: "); Serial.print(orientation[0]);
 //Serial.print("  Error: "); Serial.print(orientationError);
